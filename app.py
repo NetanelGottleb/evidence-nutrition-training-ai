@@ -11,13 +11,30 @@ st.set_page_config(
     layout="wide"
 )
 
-# עיצוב RTL בעברית והתאמת ממשק
+# ביטול מוחלט של חיצי מספרים והתאמת עיצוב RTL
 st.markdown("""
 <style>
     .stApp { direction: rtl; text-align: right; }
-    .stTextInput input, .stTextArea textarea, .stNumberInput input { direction: rtl; text-align: right; }
+    .stTextInput input, .stTextArea textarea { direction: rtl; text-align: right; }
     .stChatMessage { direction: rtl; text-align: right; }
     div[data-testid="stExpander"] { direction: rtl; text-align: right; }
+    
+    /* הסתרת כל החיצים וכפתורי הפלוס/מינוס בשדות קלט */
+    input::-webkit-outer-spin-button,
+    input::-webkit-inner-spin-button {
+        -webkit-appearance: none !important;
+        margin: 0 !important;
+    }
+    input[type=number] {
+        -moz-appearance: textfield !important;
+    }
+    button[data-testid="stNumberInputStepUp"],
+    button[data-testid="stNumberInputStepDown"],
+    div[data-testid="stNumberInputStepUp"],
+    div[data-testid="stNumberInputStepDown"] {
+        display: none !important;
+    }
+
     .disclaimer-box {
         background-color: #fff3cd;
         border-right: 5px solid #ffeeba;
@@ -70,17 +87,33 @@ tab_calc, tab_tracker, tab_chat = st.tabs([
 # ==========================================
 with tab_calc:
     st.subheader("תכנון קלורי ומאקרו-נוטריאנטים אישי")
-    st.caption("חישוב הוצאה אנרגטית לפי נוסחת Mifflin-St Jeor והנחיות ISSN לחלוקת אבות מזון")
+    st.caption("הקלד את הנתונים ישירות בתיבות הטקסט (ללא חיצים)")
     
     col_in1, col_in2, col_in3, col_in4 = st.columns(4)
     with col_in1:
         gender = st.selectbox("מין ביולוגי:", ["גבר", "אישה"])
     with col_in2:
-        age = st.number_input("גיל (שנים):", min_value=14, max_value=100, value=22, step=1)
+        age_input = st.text_input("גיל (שנים):", value="22")
     with col_in3:
-        user_weight = st.number_input("משקל (ק\"ג):", min_value=35.0, max_value=220.0, value=75.0, step=0.1, format="%.1f")
+        weight_input = st.text_input("משקל (ק\"ג):", value="75.0")
     with col_in4:
-        user_height = st.number_input("גובה (ס\"מ):", min_value=120, max_value=230, value=175, step=1)
+        height_input = st.text_input("גובה (ס\"מ):", value="175")
+        
+    # המרת ערכים בצורה בטוחה
+    try:
+        user_weight = float(weight_input.strip())
+    except (ValueError, AttributeError):
+        user_weight = 75.0
+        
+    try:
+        user_height = float(height_input.strip())
+    except (ValueError, AttributeError):
+        user_height = 175.0
+        
+    try:
+        age = int(age_input.strip())
+    except (ValueError, AttributeError):
+        age = 22
         
     col_in5, col_in6 = st.columns(2)
     with col_in5:
@@ -111,7 +144,6 @@ with tab_calc:
     else:
         bmr = (10 * user_weight) + (6.25 * user_height) - (5 * age) - 161
         
-    # מקדם פעילות (TDEE)
     activity_factors = {
         "יושבני (עבודה משרדית, ללא אימונים)": 1.2,
         "פעילות קלה (1-3 אימונים בשבוע)": 1.375,
@@ -121,10 +153,9 @@ with tab_calc:
     }
     tdee = bmr * activity_factors[activity]
     
-    # התאמה ליעד
     if "גירעון" in diet_goal:
         target_calories = tdee - 400
-        protein_per_kg = 2.0  # דגש על שימור שריר בגירעון
+        protein_per_kg = 2.0
     elif "עודף של כ-250" in diet_goal:
         target_calories = tdee + 250
         protein_per_kg = 1.8
@@ -135,11 +166,10 @@ with tab_calc:
         target_calories = tdee
         protein_per_kg = 1.8
         
-    # חלוקת מאקרו
     protein_g = round(user_weight * protein_per_kg)
     protein_kcal = protein_g * 4
     
-    fat_kcal = target_calories * 0.25  # 25% שומן
+    fat_kcal = target_calories * 0.25
     fat_g = round(fat_kcal / 9)
     
     carbs_kcal = max(0, target_calories - (protein_kcal + fat_kcal))
@@ -165,7 +195,7 @@ with tab_calc:
 # ==========================================
 with tab_tracker:
     st.subheader("יומן מעקב שקילות ואימונים")
-    st.caption("תיעוד עקבי של משקל בוקר ונתוני אימון שבועיים")
+    st.caption("הקלדה ידנית ישירה ללא כפתורי חצים")
     
     if "tracker_data" not in st.session_state:
         st.session_state.tracker_data = []
@@ -175,18 +205,27 @@ with tab_tracker:
         with f_col1:
             log_date = st.date_input("תאריך:", value=date.today())
         with f_col2:
-            log_weight = st.number_input("משקל בוקר (ק\"ג):", min_value=30.0, max_value=200.0, value=75.0, step=0.1, format="%.1f")
+            log_weight_input = st.text_input("משקל בוקר (ק\"ג):", value=f"{user_weight:.1f}")
         with f_col3:
-            log_calories = st.number_input("צריכה קלורית משוערת:", min_value=500, max_value=6000, value=2200, step=50)
+            log_calories_input = st.text_input("צריכה קלורית משוערת:", value=f"{round(target_calories)}")
         with f_col4:
             log_workout = st.text_input("אימון שבוצע / קבוצת שריר:", placeholder="למשל: רגליים וכתפיים, RIR 1-2")
             
         submitted = st.form_submit_button("הוסף רשומה ליומן")
         if submitted:
+            try:
+                parsed_weight = float(log_weight_input.strip())
+            except ValueError:
+                parsed_weight = user_weight
+            try:
+                parsed_cals = int(log_calories_input.strip())
+            except ValueError:
+                parsed_cals = round(target_calories)
+                
             st.session_state.tracker_data.append({
                 "תאריך": str(log_date),
-                "משקל (ק\"ג)": log_weight,
-                "קלוריות": log_calories,
+                "משקל (ק\"ג)": parsed_weight,
+                "קלוריות": parsed_cals,
                 "הערות אימון": log_workout if log_workout else "ללא פירוט"
             })
             st.success("הרשומה נוספה בהצלחה.")
@@ -195,7 +234,6 @@ with tab_tracker:
         df_logs = pd.DataFrame(st.session_state.tracker_data)
         st.dataframe(df_logs, use_container_width=True)
         
-        # הורדת הנתונים לקובץ CSV
         csv_data = df_logs.to_csv(index=False).encode('utf-8-sig')
         st.download_button(
             label="הורד יומן מעקב לקובץ Excel / CSV",
