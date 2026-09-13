@@ -19,7 +19,6 @@ st.markdown("""
     .stChatMessage { direction: rtl; text-align: right; }
     div[data-testid="stExpander"] { direction: rtl; text-align: right; }
     
-    /* הסתרת כל החיצים וכפתורי הפלוס/מינוס בשדות קלט */
     input::-webkit-outer-spin-button,
     input::-webkit-inner-spin-button {
         -webkit-appearance: none !important;
@@ -42,15 +41,19 @@ st.markdown("""
         border-radius: 4px;
         color: #856404;
         font-size: 13px;
-        margin-bottom: 20px;
-        line-height: 1.4;
+        margin-bottom: 12px;
+        line-height: 1.5;
     }
-    .metric-card {
-        background-color: #f8f9fa;
-        border: 1px solid #dee2e6;
-        padding: 15px;
-        border-radius: 8px;
-        text-align: center;
+    .menu-disclaimer {
+        background-color: #e2e3e5;
+        border-right: 4px solid #6c757d;
+        padding: 10px 14px;
+        border-radius: 4px;
+        color: #383d41;
+        font-size: 12px;
+        margin-top: 15px;
+        margin-bottom: 15px;
+        line-height: 1.4;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -67,27 +70,39 @@ if not api_key:
     st.error("שגיאה: מפתח API אינו מוגדר בהגדרות הסודיות (Secrets).")
     st.stop()
 
-# 2. כותרת והבהרה משפטית
-st.title("מערכת תזונה, כושר ומעקב מבוססת ראיות")
+# 2. כותרת והבהרה משפטית מעוגנת בדין הישראלי
+st.title("מערכת תזונה, כושר ומעקב מבוססת ראיות ומחקרים")
+
 st.markdown("""
 <div class="disclaimer-box">
-    <strong>הבהרה חשובה:</strong> כלי זה מיועד למטרות לימודיות והנגשת מדע בלבד. החישובים, התפריטים וההמלצות אינם מהווים ייעוץ רפואי או תזונתי אישי ואינם תחליף לרופא או דיאטן קליני מוסמך.
+    <strong>הבהרה משפטית ובריאותית חשובה (דין ישראלי):</strong><br>
+    כלי זה מיועד למטרות לימודיות, מחקריות והעשרה בלבד, ואינו מהווה ייעוץ רפואי, אבחון קליני או תפריט תזונתי פרטני לפי <em>חוק הסדרת העיסוק במקצועות הבריאות, התשס"ח-2008</em>. 
+    אין בשימוש במערכת כדי ליצור יחסי מטפל-מטופל, וחל איסור להסתמך על הפלטים כתחליף לבדיקה והתאמה אישית אצל רופא מוסמך או דיאטן קליני בעל רישיון משרד הבריאות. השימוש באפליקציה הוא על אחריותו הבלעדית של המשתמש.
 </div>
 """, unsafe_allow_html=True)
 
+with st.expander("קרא את כתב הוויתור המשפטי, תנאי השימוש והסרת האחריות המלאים"):
+    st.markdown("""
+    1. **מטרת המערכת:** המערכת פועלת באמצעות בינה מלאכותית ונועדה להמחשת עקרונות תיאורטיים בלבד בספרות המחקרית.
+    2. **היעדר יחסי מטפל-מטופל:** השימוש במערכת אינו מהווה תחליף לטיפול תזונתי או רפואי ואינו יוצר יחסי דיאטן-מטופל או מאמן-מתאמן.
+    3. **חובת בדיקה רפואית:** חובה להיוועץ ברופא ובדיאטן קליני בעל רישיון משרד הבריאות בתוקף לפני כל שינוי בצריכת המזון, עומסי האימון או נטילת תוספים.
+    4. **אוכלוסיות מיוחדות:** המערכת אינה מיועדת לקטינים, נשים בהיריון/הנקה, אנשים עם מחלות רקע (סוכרת, דיסליפידמיה, מחלות כליה, לחץ דם) או עבר של הפרעות אכילה.
+    5. **הסרת אחריות:** המפעיל אינו נושא בכל אחריות לנזק ישיר או עקיף שייגרם מהסתמכות על חישובי המערכת או הצעות התפריט. השימוש הינו באחריות המשתמש בלבד.
+    """)
+
 # 3. חלוקה ללשוניות
 tab_calc, tab_tracker, tab_chat = st.tabs([
-    "מחשבון קלוריות ומאקרו מותאם אישית",
+    "מחשבון קלוריות ומחולל תפריט לדוגמה",
     "יומן ומעקב שקילות ואימונים",
     "צ'אט ייעוץ מבוסס ספרות מחקרית"
 ])
 
 # ==========================================
-# לשונית 1: מחשבון קלוריות ומאקרו
+# לשונית 1: מחשבון ומחולל תפריט 3-5 ארוחות
 # ==========================================
 with tab_calc:
-    st.subheader("תכנון קלורי ומאקרו-נוטריאנטים אישי")
-    st.caption("הקלד את הנתונים ישירות בתיבות הטקסט (ללא חיצים)")
+    st.subheader("1. תכנון קלורי ומאקרו-נוטריאנטים")
+    st.caption("הזנה ישירה של הנתונים במקלדת (ללא חיצים)")
     
     col_in1, col_in2, col_in3, col_in4 = st.columns(4)
     with col_in1:
@@ -99,7 +114,6 @@ with tab_calc:
     with col_in4:
         height_input = st.text_input("גובה (ס\"מ):", value="175")
         
-    # המרת ערכים בצורה בטוחה
     try:
         user_weight = float(weight_input.strip())
     except (ValueError, AttributeError):
@@ -138,7 +152,6 @@ with tab_calc:
             ]
         )
         
-    # חישוב BMR
     if gender == "גבר":
         bmr = (10 * user_weight) + (6.25 * user_height) - (5 * age) + 5
     else:
@@ -175,12 +188,9 @@ with tab_calc:
     carbs_kcal = max(0, target_calories - (protein_kcal + fat_kcal))
     carbs_g = round(carbs_kcal / 4)
     
-    st.markdown("---")
-    st.subheader("תוצאות ההקצאה היומית:")
-    
     m_col1, m_col2, m_col3, m_col4 = st.columns(4)
     with m_col1:
-        st.metric("סך קלוריות מומלץ", f"{round(target_calories)} קק\"ל")
+        st.metric("סך קלוריות יעד", f"{round(target_calories)} קק\"ל")
     with m_col2:
         st.metric("חלבון יומי", f"{protein_g} גרם", f"{round(protein_kcal)} קלוריות")
     with m_col3:
@@ -188,14 +198,86 @@ with tab_calc:
     with m_col4:
         st.metric("פחמימות יומיות", f"{carbs_g} גרם", f"{round(carbs_kcal)} קלוריות")
         
-    st.info(f"המלצת חלוקה לארוחות: כ-3 עד 4 ארוחות יומיות, כאשר כל ארוחה מכילה לפחות {round(protein_g / 3.5)} גרם חלבון להבטחת גירוי מסלול mTOR וסינתזת חלבוני שריר.")
+    st.markdown("---")
+    st.subheader("2. מחולל שלד תפריט לדוגמה (3 עד 5 ארוחות)")
+    st.caption("מבוסס על ערכי מאגר צמרת של משרד הבריאות, FoodsDictionary וניירות עמדה רשמיים")
+    
+    col_m1, col_m2 = st.columns(2)
+    with col_m1:
+        num_meals = st.selectbox("מספר ארוחות רצוי ביום:", ["3 ארוחות", "4 ארוחות", "5 ארוחות"], index=1)
+    with col_m2:
+        special_condition = st.text_input(
+            "מגבלות, רגישויות או מצב בריאותי (אופציונלי):",
+            placeholder="למשל: רגישות ללקטוז, צמחוני, כולסטרול גבוה, טרום סוכרת, כשרות"
+        )
+        
+    def generate_menu_framework(cals, prot, fat, carbs, meals_count, condition):
+        system_menu_prompt = """
+אתה דיאטן וחוקר תזונת ספורט בכיר המתבסס על ניירות העמדה של משרד הבריאות הישראלי, עמותת "עתיד", ה-ISSN וה-ACSM.
+תפקידך לבנות שלד תפריט לדוגמה בלבד (הצעה לימודית), המבוסס במדויק על ערכי הרכב מזונות אמינים מתוך מאגר "צמרת" של משרד הבריאות הישראלי, FoodsDictionary ו-USDA.
+
+כללים מחייבים בבניית התפריט:
+1. דיוק בכמויות ומאגרים:
+   - ציין לכל פריט מזון משקל מדויק בגרמים (או מ"ל) לצד מידה ביתית ברורה (כגון: 150 גרם חזה עוף מבושל = פילה בינוני; 60 גרם שיבולת שועל = כ-6 כפות).
+   - הקפד שהסך הכללי של הארוחות יתכנס במדויק ליעדי הקלוריות והמאקרו שהוגדרו.
+2. חלוקה לארוחות (3 עד 5 ארוחות):
+   - פזר את החלבון שווה בשווה בין הארוחות (לפחות 25-40 גרם חלבון לארוחה לחציית סף הלאוצין ל-MPS).
+   - כלול ארוחה ייעודית סביב האימון (Pre/Post Workout).
+3. התייחסות רגועה ומעצימה למגבלות ומצבים בריאותיים:
+   - אם צוינה רגישות, מחלה או מגבלה (לדוגמה: לקטוז, סוכרת/טרום סוכרת, שומנים בדם, צליאק, צמחונות) – התייחס אליה ברוגע ובטבעיות מוחלטת, כהתאמה יומיומית סטנדרטית ("זה לא סיפור, פשוט מבצעים התאמה פשוטה במקורות המזון").
+   - התאם את מקורות המזון להנחיות הקליניות המעודכנות (למשל: בטרום סוכרת – פחמימות מורכבות עתירות סיבים ופיזור נכון; בשומנים בדם – דגש על שומן חד בלתי רווי והגבלת שומן רווי; ברגישות ללקטוז – מוצרים דלי לקטוז או סויה מועשרת).
+4. מבנה התשובה:
+   - הצג טבלה או רשימה מסודרת לכל ארוחה: מזונות, כמויות, וחלוקת מאקרו.
+   - סיכום יומי כולל של ערכים (סך קלוריות, חלבון, שומן, פחמימות, סיבים תזונתיים).
+   - תווית החרגה בולטת המבהירה שמדובר בהצעה בלבד ויש להיוועץ באיש מקצוע.
+"""
+        user_prompt = f"""
+בנה שלד תפריט לדוגמה לפי הנתונים הבאים:
+- סך קלוריות יעד: {cals} קק"ל
+- חלבון: {prot} גרם
+- שומן: {fat} גרם
+- פחמימות: {carbs} גרם
+- מספר ארוחות: {meals_count}
+- דגשים מיוחדים, רגישויות או רקע בריאותי: {condition if condition else 'ללא מגבלה מיוחדת'}
+"""
+        try:
+            client = genai.Client(api_key=api_key)
+            response = client.models.generate_content(
+                model="gemini-3.6-flash",
+                contents=user_prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_menu_prompt,
+                    tools=[types.Tool(google_search=types.GoogleSearch())],
+                    safety_settings=[
+                        types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold=types.HarmBlockThreshold.BLOCK_NONE),
+                        types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HARASSMENT, threshold=types.HarmBlockThreshold.BLOCK_NONE),
+                        types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold=types.HarmBlockThreshold.BLOCK_NONE),
+                        types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold=types.HarmBlockThreshold.BLOCK_NONE),
+                    ]
+                )
+            )
+            return response.text if response.text else "לא נוצר תפריט."
+        except Exception as e:
+            return f"אירעה שגיאה בבניית שלד התפריט ({e}). אנא נסה שוב."
+
+    if st.button("בנה שלד תפריט לדוגמה", use_container_width=True):
+        with st.spinner("מחשב כמויות ומחלק לארוחות לפי נתוני מאגר צמרת והנחיות משרד הבריאות..."):
+            menu_output = generate_menu_framework(
+                round(target_calories), protein_g, fat_g, carbs_g, num_meals, special_condition
+            )
+            st.markdown("""
+            <div class="menu-disclaimer">
+                <strong>לידיעתך:</strong> שלד התפריט המוצג הינו הדגמה לימודית וחישובית בלבד על בסיס נתוני מאגר צמרת. אין לראות בו תפריט תזונתי מחייב או הוראה לפעולה, ואין בו כדי להחליף התאמה פרטנית על ידי דיאטן קליני מורשה כחוק.
+            </div>
+            """, unsafe_allow_html=True)
+            st.markdown(menu_output)
 
 # ==========================================
 # לשונית 2: יומן מעקב ושקילות
 # ==========================================
 with tab_tracker:
     st.subheader("יומן מעקב שקילות ואימונים")
-    st.caption("הקלדה ידנית ישירה ללא כפתורי חצים")
+    st.caption("הקלדה ישירה ללא חיצים ומעקב אחר מגמת ההתקדמות")
     
     if "tracker_data" not in st.session_state:
         st.session_state.tracker_data = []
@@ -209,7 +291,7 @@ with tab_tracker:
         with f_col3:
             log_calories_input = st.text_input("צריכה קלורית משוערת:", value=f"{round(target_calories)}")
         with f_col4:
-            log_workout = st.text_input("אימון שבוצע / קבוצת שריר:", placeholder="למשל: רגליים וכתפיים, RIR 1-2")
+            log_workout = st.text_input("אימון שבוצע / דגשים:", placeholder="למשל: אימון רגליים RIR 2, שתייה מספקת")
             
         submitted = st.form_submit_button("הוסף רשומה ליומן")
         if submitted:
@@ -245,7 +327,7 @@ with tab_tracker:
         st.write("אין עדיין רשומות ביומן המעקב. הוסף רשומה בטופס למעלה.")
 
 # ==========================================
-# לשונית 3: צ'אט מחקרים וראיות
+# לשונית 3: צ'אט מחקרים וספרות
 # ==========================================
 with tab_chat:
     st.subheader("שאלות ותשובות מבוססות מחקרים ופיזיולוגיה")
@@ -255,10 +337,8 @@ with tab_chat:
 בסיס הידע שלך מושתת על מדרג הראיות המדעיות (Evidence Hierarchy), תוך עדיפות למטא-אנליזות, סקירות שיטתיות ו-RCTs שפיטים, לצד המתודולוגיות של מנגישי הידע מבוססי הראיות בישראל (גיא שלמון, אשד לין, טל בן משה).
 
 עקרונות המענה:
-1. שלב תמיד בין תזונה לאימונים:
-   - היפרטרופיה ועומס: מתח מכני, RIR/RPE, נפח שבועי אפקטיבי (10-20 סטים לשריר), זמני מנוחה מספקים (2-3 דקות בתרגילים מורכבים).
-   - תזונה ומאזן אנרגיה: קלוריות יומיות, חלבון מבוסס משקל גוף, חלוקת חלבון סביב אימונים, הידרציה, תוספים בדרג A (קריאטין, קפאין).
-2. ציטוט מחקרי מפתח: ציין שמות חוקרים ושנת פרסום (Morton et al. 2018, Schoenfeld et al. 2017, Aragon & Schoenfeld 2013, ניירות עמדה של ISSN ו-ACSM).
+1. שלב תמיד בין תזונה לאימונים (מתח מכני, נפח שבועי, קלוריות, חלבון, מאזן נוזלים).
+2. ציטוט מחקרי מפתח: ציין שמות חוקרים ושנת פרסום (Morton et al. 2018, Schoenfeld et al. 2017, ניירות עמדה של ISSN ו-ACSM).
 3. החרגה רפואית: המידע הינו לימודי בלבד ולא תחליף לייעוץ פרטני.
 """
 
