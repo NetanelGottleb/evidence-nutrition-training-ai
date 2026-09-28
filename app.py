@@ -615,4 +615,3 @@ with tab_rehab:
             with st.spinner("מעבד פרוטוקול שיקומי מותאם..."):
                 res_rehab = query_nararouter(prompt_rehab, system_rehab_prompt, selected_model_id, nara_api_key, nara_endpoint)
                 st.markdown(res_rehab)
-המערכת מציגה את app.py.
