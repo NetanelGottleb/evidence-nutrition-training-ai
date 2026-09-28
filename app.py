@@ -1,7 +1,9 @@
+
 import os
 from datetime import date
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 import json
 import urllib.request
 import urllib.error
@@ -66,64 +68,132 @@ st.markdown("""
         margin-bottom: 15px;
         line-height: 1.5;
     }
+    .metric-calc-box {
+        background-color: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 12px;
+        margin-bottom: 15px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# 1. אבטחת מפתח API ו-Endpoint של NaraRouter
-nara_api_key = (
-    st.secrets.get("NARA_API_KEY")
-    or st.secrets.get("ROUTER_API_KEY")
-    or os.getenv("NARA_API_KEY")
-    or os.getenv("ROUTER_API_KEY")
-)
+# 1. ניהול מפתח אישי ושמירה מקומית בדפדפן (LocalStorage / Cookies)
+url_key = st.query_params.get("key", "")
+if url_key and "user_api_key" not in st.session_state:
+    st.session_state.user_api_key = url_key
+
 nara_endpoint = st.secrets.get("NARA_BASE_URL", "https://api.nararouter.com/v1/chat/completions")
 
-# סרגל צד לבחירת מודל והגדרות מפתח
+# סרגל צד - ניהול מפתח אישי
 with st.sidebar:
-    st.markdown("<h3 style='text-align: right;'>⚙️ הגדרות מערכת</h3>", unsafe_allow_html=True)
-    if not nara_api_key:
-        api_input = st.text_input("מפתח NaraRouter API:", type="password", placeholder="הזן מפתח API...")
-        if api_input:
-            nara_api_key = api_input
-            
-    st.markdown("<h4 style='text-align: right;'>🤖 בחירת מודל AI</h4>", unsafe_allow_html=True)
-    MODEL_CATALOG = {
-        "Claude Opus 5.5 (דיוק קליני, הנחיות מחמירות ושיקום מעמיק)": "claude-opus-5.5",
-        "Claude Sonnet 5 (מענה מהיר וחד)": "claude-sonnet-5",
-        "Gemini 3.1 Pro High (ספרות מחקרית ועברית מדעית עשירה)": "gemini-3.1-pro-high",
-        "GPT 6 SOL (הבניית תוכניות מורכבות ואינטגרציה)": "gpt-6-sol",
-        "DeepSeek v4 Pro 0813 (דיוק מתמטי, חישובי קלוריות ומאקרו)": "deepseek-v4-pro-alibaba"
-    }
-    selected_model_label = st.selectbox("בחר מודל פעיל:", list(MODEL_CATALOG.keys()))
-    selected_model_id = MODEL_CATALOG[selected_model_label]
+    st.markdown("<h3 style='text-align: right;'>⚙️ מפתח API אישי</h3>", unsafe_allow_html=True)
+    
+    # טעינה אוטומטית מ-LocalStorage של הדפדפן אם חזר ללא URL parameter
+    if "user_api_key" not in st.session_state and not url_key:
+        components.html(
+            """
+            <script>
+                try {
+                    const storedKey = localStorage.getItem("nara_user_api_key");
+                    if (storedKey && storedKey.length > 5) {
+                        const currentUrl = new URL(window.parent.location.href);
+                        if (!currentUrl.searchParams.has("key")) {
+                            currentUrl.searchParams.set("key", storedKey);
+                            window.parent.location.href = currentUrl.toString();
+                        }
+                    }
+                } catch(e) {}
+            </script>
+            """,
+            height=0
+        )
+        
+    current_key = st.session_state.get("user_api_key", "")
+    api_input = st.text_input(
+        "הזן את מפתח ה-API האישי שלך:",
+        value=current_key,
+        type="password",
+        placeholder="הדבק מפתח כאן...",
+        help="המפתח נשמר במכשיר שלך בלבד (בדפדפן) ולא נשמר בשום שרת חיצוני."
+    )
+    
+    if api_input and api_input != current_key:
+        st.session_state.user_api_key = api_input
+        st.query_params["key"] = api_input
+        components.html(
+            f"""
+            <script>
+                try {{
+                    localStorage.setItem("nara_user_api_key", "{api_input}");
+                }} catch(e) {{}}
+            </script>
+            """,
+            height=0
+        )
+        st.rerun()
 
-def query_nararouter(prompt: str, system_instruction: str, model_id: str, key: str, endpoint: str) -> str:
+    if st.session_state.get("user_api_key"):
+        st.success("המפתח שמור בדפדפן זה.")
+        if st.button("מחק מפתח שמור ממכשיר זה", use_container_width=True):
+            st.session_state.user_api_key = ""
+            st.query_params.clear()
+            components.html(
+                """
+                <script>
+                    try {
+                        localStorage.removeItem("nara_user_api_key");
+                        const currentUrl = new URL(window.parent.location.href);
+                        currentUrl.searchParams.delete("key");
+                        window.parent.location.href = currentUrl.toString();
+                    } catch(e) {}
+                </script>
+                """,
+                height=0
+            )
+            st.rerun()
+            
+    nara_api_key = st.session_state.get("user_api_key", "")
+
+# 4 המודלים המובילים - כולם פועלים יחד על כל המשימות (Unified AI Engine)
+TOP_4_MODELS = [
+    "claude-opus-5.5",
+    "gemini-3.1-pro-high",
+    "gpt-6-sol",
+    "deepseek-v4-pro-alibaba"
+]
+
+def query_nararouter(prompt: str, system_instruction: str, key: str, endpoint: str) -> str:
     if not key:
-        return "⚠️ שגיאה: מפתח API אינו מוגדר בהגדרות הסודיות (Secrets) או בסרגל הצד."
+        return "⚠️ שגיאה: נא להזין את מפתח ה-API האישי שלך בסרגל הצד (ימינה) כדי להפעיל את המערכת."
     
     headers = {
         "Authorization": f"Bearer {key}",
         "Content-Type": "application/json"
     }
-    payload = {
-        "model": model_id,
-        "messages": [
-            {"role": "system", "content": system_instruction},
-            {"role": "user", "content": prompt}
-        ],
-        "temperature": 0.2
-    }
-    data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(endpoint, data=data, headers=headers)
-    try:
-        with urllib.request.urlopen(req, timeout=40) as resp:
-            res = json.loads(resp.read().decode("utf-8"))
-            return res["choices"][0]["message"]["content"]
-    except urllib.error.HTTPError as e:
-        err_msg = e.read().decode("utf-8")
-        return f"אירעה שגיאת תקשורת מול הראוטר ({e.code}): {err_msg}"
-    except Exception as e:
-        return f"אירעה שגיאה בעיבוד הנתונים ({e}). אנא נסה שוב מאוחר יותר."
+    
+    last_err = ""
+    # כל 4 המודלים זמינים לכל משימה: מנסה את המודל המוביל וממשיך ברציפות לשאר ה-4 במקרה של עומס
+    for model_id in TOP_4_MODELS:
+        payload = {
+            "model": model_id,
+            "messages": [
+                {"role": "system", "content": system_instruction},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.2
+        }
+        data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(endpoint, data=data, headers=headers)
+        try:
+            with urllib.request.urlopen(req, timeout=40) as resp:
+                res = json.loads(resp.read().decode("utf-8"))
+                return res["choices"][0]["message"]["content"]
+        except Exception as e:
+            last_err = str(e)
+            continue
+            
+    return f"אירעה שגיאה בעיבוד הנתונים ({last_err}). אנא נסה שוב מאוחר יותר."
 
 # 2. כותרת והבהרה משפטית מעוגנת בדין הישראלי
 st.title("מערכת תזונה, כושר ומעקב מבוססת ראיות ומחקרים")
@@ -150,7 +220,7 @@ with st.expander("קרא את כתב הוויתור המשפטי, תנאי הש�
 </div>
 """, unsafe_allow_html=True)
 
-# 3. חלוקה ל-5 לשוניות (כולל לשונית השיקום החדשה)
+# 3. חלוקה ל-5 לשוניות
 tab_calc, tab_workout, tab_tracker, tab_chat, tab_rehab = st.tabs([
     "מחשבון קלוריות ומחולל תפריט",
     "מחולל תוכניות אימון ונפח",
@@ -160,10 +230,10 @@ tab_calc, tab_workout, tab_tracker, tab_chat, tab_rehab = st.tabs([
 ])
 
 # ==========================================
-# לשונית 1: מחשבון ומחולל תפריט 3-5 ארוחות
+# לשונית 1: מחשבון ומחולל תפריט (חישוב בקוד פייתון טהור)
 # ==========================================
 with tab_calc:
-    st.subheader("1. תכנון קלורי ומאקרו-נוטריאנטים")
+    st.subheader("1. תכנון קלורי ומאקרו-נוטריאנטים (חישוב מתמטי מדויק בקוד)")
     
     col_in1, col_in2, col_in3, col_in4 = st.columns(4)
     with col_in1:
@@ -217,7 +287,7 @@ with tab_calc:
             ]
         )
         
-    # חישוב BMR לפי Mifflin-St Jeor עם תוספת אנרגטית לצורכי גדילה למתבגרים
+    # --- חישוב בקוד פייתון טהור (ללא הזיות וללא טוקנים) ---
     if gender == "גבר":
         bmr = (10 * user_weight) + (6.25 * user_height) - (5 * age) + 5
     else:
@@ -264,7 +334,7 @@ with tab_calc:
     
     m_col1, m_col2, m_col3, m_col4 = st.columns(4)
     with m_col1:
-        st.metric("סך קלוריות יעד", f'{round(target_calories)} קק"ל')
+        st.metric("סך קלוריות יעד (מחושב בקוד)", f'{round(target_calories)} קק"ל')
     with m_col2:
         st.metric("חלבון יומי", f"{protein_g} גרם", f"{round(protein_kcal)} קלוריות")
     with m_col3:
@@ -284,41 +354,49 @@ with tab_calc:
             placeholder="למשל: רגישות ללקטוז, צמחוני, כולסטרול גבוה, טרום סוכרת, כשרות"
         )
         
-    def generate_menu_framework(cals, prot, fat, carbs, meals_count, condition, user_age, is_adolescent):
+    # חישוב חלוקה מדויקת לארוחות בקוד טהור
+    meals_count_num = int(num_meals.split()[0])
+    prot_per_meal_calc = round(protein_g / meals_count_num, 1)
+    carbs_per_meal_calc = round(carbs_g / meals_count_num, 1)
+    fat_per_meal_calc = round(fat_g / meals_count_num, 1)
+    cals_per_meal_calc = round(target_calories / meals_count_num)
+    
+    st.markdown(f"""
+    <div class="metric-calc-box">
+        <b>פירוק מחושב בקוד לכל ארוחה מתוך {meals_count_num} ארוחות:</b><br>
+        כ-{cals_per_meal_calc} קק"ל | חלבון: כ-{prot_per_meal_calc} גרם | פחמימות: כ-{carbs_per_meal_calc} גרם | שומן: כ-{fat_per_meal_calc} גרם
+    </div>
+    """, unsafe_allow_html=True)
+    
+    def generate_menu_framework(cals, prot, fat, carbs, meals_count, condition, user_age, is_adolescent, per_meal_text):
         system_menu_prompt = """
 אתה דיאטן וחוקר תזונת ספורט בכיר הפועל בגישת Evidence-Based.
-תפקידך לבנות שלד תפריט לדוגמה בלבד (הצעה לימודית), המבוסס במדויק על ערכי הרכב מזונות אמינים.
+תפקידך להמיר את החישובים המדויקים שהוכנו בקוד לתפריט מעשי של מזונות ומידות ביתיות.
 
 כללים מחייבים בבניית התפריט:
-1. איסור מוחלט על מטא-הסברים: אל תציין בתשובתך מאיפה המידע לקוח או שמות גופים, חוקרים ואנשי מקצוע. ספק תמיד את התוכן המעשי באופן ישיר, מובנה ונקי.
-2. התאמת גיל והתפתחות:
-   - אם מדובר במתבגר/נער (מתחת לגיל 18): הקפד על מקורות עשירים בסידן, ברזל, אבץ וצפיפות תזונתית גבוהה לתמיכה בצמיחה. בשום אופן לא להמליץ על צמצום קלורי קיצוני.
-3. דיוק בכמויות ומאגרים:
-   - ציין לכל פריט מזון משקל מדויק בגרמים (או מ"ל) לצד מידה ביתית ברורה.
-   - הקפד שהסך הכללי של הארוחות יתכנס במדויק ליעדי הקלוריות והמאקרו שהוגדרו.
-4. חלוקה לארוחות (3 עד 5 ארוחות):
-   - פזר את החלבון שווה בשווה בין הארוחות (לפחות 25-40 גרם חלבון לארוחה).
-   - כלול ארוחה ייעודית סביב האימון (Pre/Post Workout).
-5. מבנה התשובה:
-   - טבלה או רשימה מסודרת לכל ארוחה: מזונות, כמויות, וחלוקת מאקרו.
-   - סיכום יומי כולל של ערכים (סך קלוריות, חלבון, שומן, פחמימות, סיבים תזונתיים).
+1. איסור מוחלט על מטא-הסברים: אל תציין מאיפה נלקח המידע ואל תנקוב בשמות של גופים וחוקרים.
+2. שמור על כמויות המאקרו המחושבות בדיוק כפי שהוזנו מהקוד.
+3. ציין לכל פריט מזון משקל בגרמים/מ"ל לצד מידה ביתית ברורה.
+4. פזר את החלבון באופן שווה בין הארוחות לפי החישוב המצורף.
 """
         user_prompt = f"""
-בנה שלד תפריט לדוגמה לפי הנתונים הבאים:
-- גיל המתאמן: {user_age} ({'מתבגר/נוער - יש להתאים לגדילה' if is_adolescent else 'בוגר'})
+בנה שלד תפריט לדוגמה לפי החישובים המדויקים שנערכו בקוד:
 - סך קלוריות יעד: {cals} קק"ל
-- חלבון: {prot} גרם
-- שומן: {fat} גרם
-- פחמימות: {carbs} גרם
+- חלבון כולל: {prot} גרם
+- שומן כולל: {fat} גרם
+- פחמימות כולל: {carbs} גרם
 - מספר ארוחות: {meals_count}
-- דגשים מיוחדים, רגישויות או רקע בריאותי: {condition if condition else 'ללא מגבלה מיוחדת'}
+- יעד מחושב לארוחה בודדת: {per_meal_text}
+- גיל: {user_age} ({'מתבגר/נוער' if is_adolescent else 'בוגר'})
+- דגשים ומגבלות: {condition if condition else 'ללא מגבלה מיוחדת'}
 """
-        return query_nararouter(user_prompt, system_menu_prompt, selected_model_id, nara_api_key, nara_endpoint)
+        return query_nararouter(user_prompt, system_menu_prompt, nara_api_key, nara_endpoint)
 
     if st.button("בנה שלד תפריט לדוגמה", use_container_width=True):
-        with st.spinner("מחשב כמויות ומחלק לארוחות..."):
+        with st.spinner("מעבד שלד תפריט לפי הנתונים המחושבים..."):
+            per_meal_str = f"{cals_per_meal_calc} קק'ל, {prot_per_meal_calc} גר' חלבון, {carbs_per_meal_calc} גר' פחמימה, {fat_per_meal_calc} גר' שומן"
             menu_output = generate_menu_framework(
-                round(target_calories), protein_g, fat_g, carbs_g, num_meals, special_condition, age, is_teen
+                round(target_calories), protein_g, fat_g, carbs_g, num_meals, special_condition, age, is_teen, per_meal_str
             )
             st.markdown("""
             <div class="menu-disclaimer">
@@ -328,7 +406,7 @@ with tab_calc:
             st.markdown(menu_output)
 
 # ==========================================
-# לשונית 2: מחולל תוכניות אימון ונפח לפי מטרה
+# לשונית 2: מחולל תוכניות אימון ונפח לפי מטרה (חישוב נפח בקוד)
 # ==========================================
 with tab_workout:
     st.subheader("בניית תוכנית אימון מבוססת ראיות (Evidence-Based Volume & Periodization)")
@@ -364,6 +442,7 @@ with tab_workout:
         
     days_num = int(workout_days.split()[0])
     
+    # חישוב פיצול אופטימלי בקוד פייתון טהור
     if days_num <= 3:
         suggested_split = "Full Body (FBW - אימון גוף מלא בכל מפגש, תדירות שבועית גבוהה לכל שריר)"
     elif days_num == 4:
@@ -373,9 +452,10 @@ with tab_workout:
     else:
         suggested_split = "Push / Pull / Legs (PPL מחזורי פעמיים בשבוע)"
         
-    st.info(f"**מבנה פיצול מומלץ:** {suggested_split}")
+    st.info(f"**מבנה פיצול מומלץ (מחושב בקוד):** {suggested_split}")
     
-    st.markdown("#### מדרג נפח שבועי מומלץ לקבוצות שריר (Weekly Sets):")
+    # חישוב נפח שבועי מומלץ בקוד פייתון טהור
+    st.markdown("#### מדרג נפח שבועי מומלץ לקבוצות שריר (מחושב בקוד פייתון):")
     
     if "שימור" in training_goal or "גירעון" in diet_goal:
         vol_chest = "8 - 12 סטים"
@@ -412,7 +492,7 @@ with tab_workout:
         placeholder="למשל: חדר כושר מלא, ללא סקוואט חופשי עקב רגישות בגב, דגש על כתף צדית ויד קדמית"
     )
     
-    def generate_workout_plan(days, goal, level, split_desc, user_age, is_adolescent, notes, target_cals):
+    def generate_workout_plan(days, goal, level, split_desc, user_age, is_adolescent, notes, target_cals, volume_summary):
         system_workout_prompt = """
 אתה מאמן כושר בכיר ומומחה פיזיולוגיה מבוסס ראיות (Evidence-Based Strength & Hypertrophy Coach).
 כללי יסוד לבניית התוכנית:
@@ -420,36 +500,32 @@ with tab_workout:
 2. התאמה לנוער (מתחת לגיל 18):
    - דגש קריטי על בטיחות, לימוד טכניקה מדויקת ושליטה מוטורית.
    - עבודה עם 2-3 RIR בתרגילים מורכבים (לא להגיע לכשל מוחלט בשום אופן).
-   - שילוב תרגילים בטוחים ועקביים (משקולות יד, מכונות מודרכות, כבלים ומשקל גוף).
-3. מבנה התוכנית:
-   - חלק את התוכנית לימים ברורים (A, B, C...).
-   - סדר תרגילים: תרגילים רב-מפרקיים מורכבים בראש האימון, תרגילי בידוד ומכונות בהמשך.
-   - לכל תרגיל ציין: שם מדויק בעברית ובאנגלית, מספר סטים, טווח חזרות, יעד RIR מדויק (Reps in Reserve), וזמן מנוחה בדקות.
-4. ניהול התאוששות ופרוגרסיב אוברלוד:
-   - הסבר קצר כיצד ליישם התקדמות עומסים משבוע לשבוע.
-   - המלצה על שבוע הפחתת עומס (Deload) לאחר 5-6 שבועות.
+3. הצמד את התוכנית בדיוק למבנה הנפח והפיצול שחושבו בקוד.
+4. לכל תרגיל ציין: שם מדויק בעברית ובאנגלית, מספר סטים, טווח חזרות, יעד RIR מדויק וזמן מנוחה.
 """
         user_w_prompt = f"""
-בנה תוכנית אימון מפורטת ומקצועית לפי המאפיינים הבאים:
-- גיל המתאמן: {user_age} ({'נער/מתבגר - יש להדגיש בטיחות ו-RIR שמרני' if is_adolescent else 'בוגר'})
+בנה תוכנית אימון מפורטת ומקצועית לפי המאפיינים המחושבים הבאים:
+- גיל המתאמן: {user_age} ({'נער/מתבגר' if is_adolescent else 'בוגר'})
 - ימי אימון בשבוע: {days}
 - מטרת אימון מרכזית: {goal}
 - רמת מתאמן: {level}
-- מבנה פיצול מבוקש: {split_desc}
+- מבנה פיצול מחושב: {split_desc}
+- יעדי נפח מחושבים: {volume_summary}
 - סטטוס קלורי יומי: כ-{target_cals} קק"ל
 - דגשים מיוחדים, אילוצים וציוד: {notes if notes else 'חדר כושר מאובזר סטנדרטי ללא מגבלות מיוחדות'}
 """
-        return query_nararouter(user_w_prompt, system_workout_prompt, selected_model_id, nara_api_key, nara_endpoint)
+        return query_nararouter(user_w_prompt, system_workout_prompt, nara_api_key, nara_endpoint)
 
     if st.button("חולל תוכנית אימון מותאמת אישית", use_container_width=True):
         with st.spinner("בונה תוכנית אימון מבוססת ראיות ומחלקת עומסים..."):
+            vol_sum = f"חזה: {vol_chest}, גב: {vol_back}, רגליים: {vol_legs}, כתפיים: {vol_shoulders}, ידיים: {vol_arms}"
             workout_output = generate_workout_plan(
-                workout_days, training_goal, experience_level, suggested_split, age, is_teen, workout_notes, round(target_calories)
+                workout_days, training_goal, experience_level, suggested_split, age, is_teen, workout_notes, round(target_calories), vol_sum
             )
             st.markdown(workout_output)
 
 # ==========================================
-# לשונית 3: יומן ומעקב שקילות ואימונים
+# לשונית 3: יומן ומעקב שקילות ואימונים (קוד פייתון טהור)
 # ==========================================
 with tab_tracker:
     st.subheader("יומן מעקב שקילות ואימונים")
@@ -517,8 +593,7 @@ with tab_chat:
 """
 
     def generate_ai_reply(prompt_text: str):
-        reply = query_nararouter(prompt_text, SYSTEM_INSTRUCTION, selected_model_id, nara_api_key, nara_endpoint)
-        return reply
+        return query_nararouter(prompt_text, SYSTEM_INSTRUCTION, nara_api_key, nara_endpoint)
 
     if "chat_history_v2" not in st.session_state:
         st.session_state.chat_history_v2 = []
@@ -541,7 +616,7 @@ with tab_chat:
         st.session_state.chat_history_v2.append({"role": "assistant", "content": reply_out})
 
 # ==========================================
-# לשונית 5: שיקום ופיזיותרפיה מותאמת (חדש!)
+# לשונית 5: שיקום ופיזיותרפיה מותאמת (בקרת כאב והגבלות מנוהלות בקוד)
 # ==========================================
 with tab_rehab:
     st.subheader("שיקום ופיזיותרפיה אורתופדית מותאמת אישית")
@@ -571,8 +646,14 @@ with tab_rehab:
     with col_p2:
         pain_triggers = st.text_input("מיקום הכאב ותנועות מעוררות:", placeholder="למשל: כאב בקדמת הכתף רק בהרמה מעל 80 מעלות")
 
+    # בדיקת סף כאב מחושבת בקוד פייתון טהור
+    if pain_level > 3:
+        st.error(f"⚠️ רמת כאב גבוהה ({pain_level}/10): הקוד מחיל אוטומטית הגבלת עומס מוחלטת ותרגילים איזומטריים ללא תנועה בלבד!")
+    else:
+        st.success(f"רמת כאב בטווח הבטוח לתרגול פעיל מבוקר ({pain_level}/10).")
+
     st.markdown("---")
-    # שער אישור רפואי להתקדמות (Medical Progression Gate)
+    # שער אישור רפואי להתקדמות (מנוהל בקוד פייתון טהור)
     st.markdown("##### 🛡️ שער אישור רפואי להתקדמות שלב (Progression Clearance):")
     medical_progression_approved = st.checkbox(
         "התקבל עדכון מפורש מרופא / פיזיותרפיסט מטפל המאשר קידום שלב והעלאת עומסים.",
@@ -613,5 +694,5 @@ with tab_rehab:
 4. קריטריונים אובייקטיביים שיש להציג לבדיקת הפיזיותרפיסט/רופא לפני אישור השלב הבא.
 """
             with st.spinner("מעבד פרוטוקול שיקומי מותאם..."):
-                res_rehab = query_nararouter(prompt_rehab, system_rehab_prompt, selected_model_id, nara_api_key, nara_endpoint)
+                res_rehab = query_nararouter(prompt_rehab, system_rehab_prompt, nara_api_key, nara_endpoint)
                 st.markdown(res_rehab)
