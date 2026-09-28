@@ -420,4 +420,202 @@ with tab_workout:
 2. התאמה לנוער (מתחת לגיל 18):
    - דגש קריטי על בטיחות, לימוד טכניקה מדויקת ושליטה מוטורית.
    - עבודה עם 2-3 RIR בתרגילים מורכבים (לא להגיע לכשל מוחלט בשום אופן).
-   - שילוב תרגילים בטוחים ועקביים (משקולות יד, מכונות מודרכות
+   - שילוב תרגילים בטוחים ועקביים (משקולות יד, מכונות מודרכות, כבלים ומשקל גוף).
+3. מבנה התוכנית:
+   - חלק את התוכנית לימים ברורים (A, B, C...).
+   - סדר תרגילים: תרגילים רב-מפרקיים מורכבים בראש האימון, תרגילי בידוד ומכונות בהמשך.
+   - לכל תרגיל ציין: שם מדויק בעברית ובאנגלית, מספר סטים, טווח חזרות, יעד RIR מדויק (Reps in Reserve), וזמן מנוחה בדקות.
+4. ניהול התאוששות ופרוגרסיב אוברלוד:
+   - הסבר קצר כיצד ליישם התקדמות עומסים משבוע לשבוע.
+   - המלצה על שבוע הפחתת עומס (Deload) לאחר 5-6 שבועות.
+"""
+        user_w_prompt = f"""
+בנה תוכנית אימון מפורטת ומקצועית לפי המאפיינים הבאים:
+- גיל המתאמן: {user_age} ({'נער/מתבגר - יש להדגיש בטיחות ו-RIR שמרני' if is_adolescent else 'בוגר'})
+- ימי אימון בשבוע: {days}
+- מטרת אימון מרכזית: {goal}
+- רמת מתאמן: {level}
+- מבנה פיצול מבוקש: {split_desc}
+- סטטוס קלורי יומי: כ-{target_cals} קק"ל
+- דגשים מיוחדים, אילוצים וציוד: {notes if notes else 'חדר כושר מאובזר סטנדרטי ללא מגבלות מיוחדות'}
+"""
+        return query_nararouter(user_w_prompt, system_workout_prompt, selected_model_id, nara_api_key, nara_endpoint)
+
+    if st.button("חולל תוכנית אימון מותאמת אישית", use_container_width=True):
+        with st.spinner("בונה תוכנית אימון מבוססת ראיות ומחלקת עומסים..."):
+            workout_output = generate_workout_plan(
+                workout_days, training_goal, experience_level, suggested_split, age, is_teen, workout_notes, round(target_calories)
+            )
+            st.markdown(workout_output)
+
+# ==========================================
+# לשונית 3: יומן ומעקב שקילות ואימונים
+# ==========================================
+with tab_tracker:
+    st.subheader("יומן מעקב שקילות ואימונים")
+    
+    if "tracker_data" not in st.session_state:
+        st.session_state.tracker_data = []
+        
+    with st.form("add_log_form", clear_on_submit=True):
+        f_col1, f_col2, f_col3, f_col4 = st.columns(4)
+        with f_col1:
+            log_date = st.date_input("תאריך:", value=date.today())
+        with f_col2:
+            log_weight_input = st.text_input('משקל בוקר (ק"ג):', value=f"{user_weight:.1f}")
+        with f_col3:
+            log_calories_input = st.text_input("צריכה קלורית משוערת:", value=f"{round(target_calories)}")
+        with f_col4:
+            log_workout = st.text_input("אימון שבוצע / דגשים:", placeholder="למשל: אימון רגליים RIR 2, שתייה מספקת")
+            
+        submitted = st.form_submit_button("הוסף רשומה ליומן")
+        if submitted:
+            try:
+                parsed_weight = float(log_weight_input.strip())
+            except ValueError:
+                parsed_weight = user_weight
+            try:
+                parsed_cals = int(log_calories_input.strip())
+            except ValueError:
+                parsed_cals = round(target_calories)
+                
+            st.session_state.tracker_data.append({
+                "תאריך": str(log_date),
+                'משקל (ק"ג)': parsed_weight,
+                "קלוריות": parsed_cals,
+                "הערות אימון": log_workout if log_workout else "ללא פירוט"
+            })
+            st.success("הרשומה נוספה בהצלחה.")
+            
+    if st.session_state.tracker_data:
+        df_logs = pd.DataFrame(st.session_state.tracker_data)
+        st.dataframe(df_logs, use_container_width=True)
+        
+        csv_data = df_logs.to_csv(index=False).encode('utf-8-sig')
+        st.download_button(
+            label="הורד יומן מעקב לקובץ Excel / CSV",
+            data=csv_data,
+            file_name=f"fitness_tracker_{date.today()}.csv",
+            mime="text/csv"
+        )
+    else:
+        st.write("אין עדיין רשומות ביומן המעקב. הוסף רשומה בטופס למעלה.")
+
+# ==========================================
+# לשונית 4: צ'אט ייעוץ ומחקרים
+# ==========================================
+with tab_chat:
+    st.subheader("שאלות ותשובות מבוססות מחקרים ופיזיולוגיה")
+    
+    SYSTEM_INSTRUCTION = """
+אתה מומחה בכיר בתחומי תזונת הספורט, פיזיולוגיית המאמץ והמטבוליזם בגישת Evidence-Based.
+עקרונות המענה:
+1. איסור מוחלט על מטא-הסברים: ענה ישירות, מקצועי ונקי. אל תציין מאיפה נלקח המידע ואל תנקוב בשמות של מנגישי ידע, חוקרים או גופים ספציפיים.
+2. שלב תמיד בין תזונה לאימונים (מתח מכני, נפח שבועי, קלוריות, חלבון, מאזן נוזלים).
+3. התאמת גיל: כאשר מתייחסים לבני נוער/מתבגרים (מתחת לגיל 18), הדגש צורכי גדילה, מניעת גירעון אנרגטי חריף, צריכת סידן/חלבון מספקת והקפדה על עבודה בטוחה עם RIR שמרני וללא כשל מוחלט.
+4. החרגה רפואית: המידע הינו לימודי בלבד ולא תחליף לייעוץ פרטני.
+"""
+
+    def generate_ai_reply(prompt_text: str):
+        reply = query_nararouter(prompt_text, SYSTEM_INSTRUCTION, selected_model_id, nara_api_key, nara_endpoint)
+        return reply
+
+    if "chat_history_v2" not in st.session_state:
+        st.session_state.chat_history_v2 = []
+
+    for msg in st.session_state.chat_history_v2:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+
+    chat_query = st.chat_input("שאל/י על אימונים, תזונת ספורט, קריאטין, מסה, חיטוב ומחקרים...")
+    if chat_query:
+        st.session_state.chat_history_v2.append({"role": "user", "content": chat_query})
+        with st.chat_message("user"):
+            st.markdown(chat_query)
+            
+        with st.chat_message("assistant"):
+            with st.spinner("מעבד נתונים ומנתח..."):
+                reply_out = generate_ai_reply(chat_query)
+                st.markdown(reply_out)
+                
+        st.session_state.chat_history_v2.append({"role": "assistant", "content": reply_out})
+
+# ==========================================
+# לשונית 5: שיקום ופיזיותרפיה מותאמת (חדש)
+# ==========================================
+with tab_rehab:
+    st.subheader("שיקום ופיזיותרפיה אורתופדית מותאמת אישית")
+    
+    col_r1, col_r2 = st.columns(2)
+    with col_r1:
+        injured_part = st.text_input("האיבר / החלק הפגוע והאבחנה:", placeholder="למשל: כתף ימין - קרע חלקי ב-Supraspinatus, או ברך שמאל - שיקום לאחר שחזור ACL")
+        rehab_phase = st.selectbox(
+            "שלב נוכחי מאז הפציעה/ניתוח:",
+            ["שלב אקוטי מוקדם (שבועות 0-3)", "שלב תת-אקוטי / שגשוג (שבועות 3-8)", "שלב שיפוץ הרקמה וחיזוק פונקציונלי (חודשיים ומעלה)", "שיקום פציעה כרונית / גידית"]
+        )
+    with col_r2:
+        medical_summary = st.text_area(
+            "סיכום האורתופד / פיזיותרפיסט / מנתח (הדבק כאן את הסיכום הרפואי):",
+            placeholder="הדבק כאן את סיכום הביקור והנחיות הרופא/פיזיותרפיסט...",
+            height=100
+        )
+
+    contraindications = st.text_input(
+        "הגבלות ת00
+        )
+
+    contraindications = st.text_input(
+        "הגבלות תנועה ועומס מוגדרות מראש (ROM, נשיאת משקל, זוויות אסורות):",
+        placeholder="למשל: איסור נשיאת משקל מלא, אסור סיבוב חיצוני מעל 30 מעלות, ללא קפיצות"
+    )
+
+    col_p1, col_p2 = st.columns(2)
+    with col_p1:
+        pain_level = st.slider("רמת כאב נוכחית (0 עד 10):", 0, 10, 2)
+    with col_p2:
+        pain_triggers = st.text_input("מיקום הכאב ותנועות מעוררות:", placeholder="למשל: כאב בקדמת הכתף רק בהרמה מעל 80 מעלות")
+
+    st.markdown("---")
+    # שער אישור רפואי להתקדמות (Medical Progression Gate)
+    st.markdown("##### 🛡️ שער אישור רפואי להתקדמות שלב (Progression Clearance):")
+    medical_progression_approved = st.checkbox(
+        "התקבל עדכון מפורש מרופא / פיזיותרפיסט מטפל המאשר קידום שלב והעלאת עומסים.",
+        value=False,
+        help="עקרון בטיחות מחייב: אין להעלות דרגת קושי או לעבור לשלב השיקום הבא ללא בדיקה והסרת הגבלות על ידי הגורם המטפל."
+    )
+    
+    if not medical_progression_approved:
+        st.warning("שער התקדמות נעול: התוכנית תישאר במסגרת השלב הנוכחי, ללא העלאת עומסים וללא סיכון הרקמה המחלימה.")
+    else:
+        st.success("שער התקדמות מאושר: המערכת תבנה את שלב ההתקדמות הבא בהתאם להנחיות הגורם המטפל.")
+
+    if st.button("חולל פרוטוקול פיזיותרפיה ותרגול מותאם", use_container_width=True):
+        if not injured_part.strip() or not medical_summary.strip():
+            st.error("נא להזין את החלק הפגוע ואת סיכום הגורם הרפואי כדי להבטיח התאמה בטיחותית.")
+        else:
+            system_rehab_prompt = """
+אתה מומחה פיזיותרפיה ושיקום אורתופדי מבוסס ראיות.
+עקרונות מחייבים:
+1. איסור מוחלט על מטא-הסברים: ספק את התוצר ישירות ללא ציון שמות מקורות או מאיפה לקוח המידע.
+2. התאמה קפדנית להגבלות הרופא/פיזיותרפיסט.
+3. ניהול עומס וכאב: התייחס ישירות לרמת הכאב שהוזנה. אם הכאב מעל 3/10, דרוש הפחתת עומס ותרגילים איזומטריים ללא כאב.
+4. נעילת התקדמות: אם לא אושר קידום שלב רפואי, יש להישאר בשלב הנוכחי בלבד ללא העלאת דרגות קושי!
+"""
+            prompt_rehab = f"""
+בנה פרוטוקול תרגול שיקומי מותאם:
+- איבר פגוע ואבחנה: {injured_part}.
+- שלב נוכחי: {rehab_phase}.
+- סיכום רפואי רשמי: {medical_summary}.
+- הגבלות תנועה ועומס: {contraindications if contraindications else "אין הגבלות נוספות מעבר לסיכום"}.
+- סטטוס כאב: רמת כאב {pain_level}/10, מיקום ותנועות מעוררות: {pain_triggers if pain_triggers else "אין"}.
+- אישור קידום שלב: {"מאושר להתקדם לשלב הבא בהתאם לבדיקה רפואית" if medical_progression_approved else "לא אושר עדיין קידום שלב - שמור על השלב הנוכחי בלבד ללא העלאת עומס!"}.
+
+ספק ישירות:
+1. הנחיות עומס ובטיחות מותאמות לרמת הכאב ({pain_level}/10).
+2. פרוטוקול תרגילים מפורט ובטוח (טווחי תנועה מותרים, הפעלה מוטורית, סטים וחזרות).
+3. תנועות ותרגילים אסורים בשלב זה (Red Flags).
+4. קריטריונים אובייקטיביים שיש להציג לבדיקת הפיזיותרפיסט/רופא לפני אישור השלב הבא.
+"""
+            with st.spinner("מעבד פרוטוקול שיקומי מותאם..."):
+                res_rehab = query_nararouter(prompt_rehab, system_rehab_prompt, selected_model_id, nara_api_key, nara_endpoint)
+                st.markdown(res_rehab)
