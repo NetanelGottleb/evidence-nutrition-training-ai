@@ -1,3 +1,7 @@
+
+app.py
+
+100%
 import os
 from datetime import date
 import pandas as pd
@@ -541,7 +545,7 @@ with tab_chat:
         st.session_state.chat_history_v2.append({"role": "assistant", "content": reply_out})
 
 # ==========================================
-# לשונית 5: שיקום ופיזיותרפיה מותאמת (חדש)
+# לשונית 5: שיקום ופיזיותרפיה מותאמת (חדש!)
 # ==========================================
 with tab_rehab:
     st.subheader("שיקום ופיזיותרפיה אורתופדית מותאמת אישית")
@@ -558,10 +562,6 @@ with tab_rehab:
             "סיכום האורתופד / פיזיותרפיסט / מנתח (הדבק כאן את הסיכום הרפואי):",
             placeholder="הדבק כאן את סיכום הביקור והנחיות הרופא/פיזיותרפיסט...",
             height=100
-        )
-
-    contraindications = st.text_input(
-        "הגבלות ת00
         )
 
     contraindications = st.text_input(
@@ -619,3 +619,4 @@ with tab_rehab:
             with st.spinner("מעבד פרוטוקול שיקומי מותאם..."):
                 res_rehab = query_nararouter(prompt_rehab, system_rehab_prompt, selected_model_id, nara_api_key, nara_endpoint)
                 st.markdown(res_rehab)
+המערכת מציגה את app.py.
